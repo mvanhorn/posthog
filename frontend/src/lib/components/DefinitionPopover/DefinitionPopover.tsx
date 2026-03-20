@@ -3,6 +3,7 @@ import './DefinitionPopover.scss'
 import clsx from 'clsx'
 import { useActions, useValues } from 'kea'
 
+import { IconPin } from '@posthog/icons'
 import { LemonDivider, ProfilePicture } from '@posthog/lemon-ui'
 
 import { DefinitionPopoverState, definitionPopoverLogic } from 'lib/components/DefinitionPopover/definitionPopoverLogic'
@@ -33,6 +34,8 @@ interface HeaderProps {
     icon: React.ReactNode
     onEdit?: () => void
     onView?: () => void
+    onTogglePin?: () => void
+    isPinned?: boolean
 }
 
 function Header({
@@ -42,6 +45,8 @@ function Header({
     icon,
     onEdit: _onEdit,
     onView: _onView,
+    onTogglePin,
+    isPinned,
 }: HeaderProps): JSX.Element {
     const { state, type, viewFullDetailUrl, hideView, hideEdit, isViewable, openDetailInNewTab } =
         useValues(definitionPopoverLogic)
@@ -67,6 +72,12 @@ function Header({
                 </div>
                 {state === DefinitionPopoverState.View && (
                     <div className="definition-popover-header-row-buttons click-outside-block">
+                        {onTogglePin && (
+                            <Link onClick={onTogglePin} data-attr="definition-popover-pin-button">
+                                <IconPin className={clsx('size-3.5', isPinned ? 'text-primary' : 'text-muted')} />
+                                {isPinned ? 'Unpin' : 'Pin'}
+                            </Link>
+                        )}
                         {!hideEdit && isViewable && <Link onClick={onEdit}>Edit</Link>}
                         {!hideView && isViewable && (
                             <Link

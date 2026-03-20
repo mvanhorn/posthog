@@ -8,11 +8,9 @@ import { IconFlag, IconServer } from '@posthog/icons'
 
 import { infiniteListLogic } from 'lib/components/TaxonomicFilter/infiniteListLogic'
 import { infiniteListLogicType } from 'lib/components/TaxonomicFilter/infiniteListLogicType'
-import {
-    hasRecentContext,
-    recentTaxonomicFiltersLogic,
-    stripRecentContext,
-} from 'lib/components/TaxonomicFilter/recentTaxonomicFiltersLogic'
+import { pinnedTaxonomicFiltersLogic } from 'lib/components/TaxonomicFilter/pinnedTaxonomicFiltersLogic'
+import { recentTaxonomicFiltersLogic } from 'lib/components/TaxonomicFilter/recentTaxonomicFiltersLogic'
+import { getItemContext, stripContext } from 'lib/components/TaxonomicFilter/taxonomicFilterContext'
 import {
     DataWarehousePopoverField,
     ExcludedProperties,
@@ -1393,13 +1391,10 @@ export const taxonomicFilterLogic = kea<taxonomicFilterLogicType>([
                     })
                 }
 
-                // Record to recents (deferred to avoid render loop).
-                // Skip property groups — these are just the key-picking step;
-                // the complete filter (with operator + value) is recorded by propertyFilterLogic.
-                const sourceGroupType = hasRecentContext(item) ? item._recentContext.sourceGroupType : group.type
-                const hasCompletePropertyFilter = hasRecentContext(item) && item._recentContext.propertyFilter
+                const ctx = getItemContext(item)
+                const sourceGroupType = ctx?.sourceGroupType ?? group.type
                 const isRecordedByPropertyFilterLogic =
-                    !hasCompletePropertyFilter &&
+                    !ctx?.propertyFilter &&
                     (PROPERTY_TAXONOMIC_GROUP_TYPES.has(sourceGroupType) ||
                         SHORTCUT_TO_PROPERTY_FILTER_GROUP_TYPES.has(sourceGroupType) ||
                         sourceGroupType.startsWith(TaxonomicFilterGroupType.GroupsPrefix))
@@ -1407,27 +1402,29 @@ export const taxonomicFilterLogic = kea<taxonomicFilterLogicType>([
                 if (!isRecordedByPropertyFilterLogic) {
                     setTimeout(() => {
                         if (recentTaxonomicFiltersLogic.isMounted()) {
-                            const stripped = hasRecentContext(item) ? stripRecentContext(item) : item
+                            const stripped = stripContext(item)
                             const cleanItem = { name: stripped.name, ...(stripped.id ? { id: stripped.id } : {}) }
-                            const sourceGroupName = hasRecentContext(item)
-                                ? item._recentContext.sourceGroupName
-                                : group.name
-                            const propertyFilterFromRecent = hasRecentContext(item)
-                                ? item._recentContext.propertyFilter
-                                : undefined
                             recentTaxonomicFiltersLogic.actions.recordRecentFilter(
                                 sourceGroupType,
-                                sourceGroupName,
+                                ctx?.sourceGroupName ?? group.name,
                                 value,
                                 cleanItem,
                                 teamLogic.values.currentTeamId ?? undefined,
-                                propertyFilterFromRecent
+                                ctx?.propertyFilter
                             )
                         }
                     }, 0)
                 }
 
-                props.onChange?.(group, value, item)
+                if (ctx?.source === 'pinned' && pinnedTaxonomicFiltersLogic.isMounted()) {
+                    pinnedTaxonomicFiltersLogic.actions.incrementPinCount(
+                        ctx.sourceGroupType,
+                        value,
+                        ctx.propertyFilter
+                    )
+                }
+
+                props.onChange?.(group, value, stripContext(item))
             } else if (group.type === TaxonomicFilterGroupType.HogQLExpression && value) {
                 props.onChange?.(group, value, item)
             } else if (props.onEnter) {

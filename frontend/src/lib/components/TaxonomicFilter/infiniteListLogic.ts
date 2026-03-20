@@ -6,6 +6,10 @@ import { combineUrl } from 'kea-router'
 import api from 'lib/api'
 import { formatPropertyLabel } from 'lib/components/PropertyFilters/utils'
 import {
+    hasPinnedContext,
+    pinnedTaxonomicFiltersLogic,
+} from 'lib/components/TaxonomicFilter/pinnedTaxonomicFiltersLogic'
+import {
     hasRecentContext,
     recentTaxonomicFiltersLogic,
 } from 'lib/components/TaxonomicFilter/recentTaxonomicFiltersLogic'
@@ -152,6 +156,8 @@ export const infiniteListLogic = kea<infiniteListLogicType>([
             ['currentTeamId'],
             recentTaxonomicFiltersLogic,
             ['recentFilterItems'],
+            pinnedTaxonomicFiltersLogic,
+            ['pinnedFilterItems', 'topPinnedItems'],
         ],
         actions: [taxonomicFilterLogic(props), ['setSearchQuery', 'selectItem', 'infiniteListResultsReceived']],
     })),
@@ -355,6 +361,32 @@ export const infiniteListLogic = kea<infiniteListLogicType>([
                 )
             },
         ],
+        contextFilteredPinnedItems: [
+            (s) => [s.pinnedFilterItems, s.taxonomicGroupTypes],
+            (
+                pinnedFilterItems: TaxonomicDefinitionTypes[],
+                taxonomicGroupTypes: TaxonomicFilterGroupType[]
+            ): TaxonomicDefinitionTypes[] => {
+                if (!pinnedFilterItems?.length) {
+                    return []
+                }
+                const availableTypes = new Set(taxonomicGroupTypes)
+                return pinnedFilterItems.filter(
+                    (item) => hasPinnedContext(item) && availableTypes.has(item._pinnedContext.sourceGroupType)
+                )
+            },
+        ],
+        pinnedItemsForCurrentGroup: [
+            (s) => [s.contextFilteredPinnedItems, s.listGroupType],
+            (
+                contextFilteredPinnedItems: TaxonomicDefinitionTypes[],
+                listGroupType: TaxonomicFilterGroupType
+            ): TaxonomicDefinitionTypes[] => {
+                return contextFilteredPinnedItems.filter(
+                    (item) => hasPinnedContext(item) && item._pinnedContext.sourceGroupType === listGroupType
+                )
+            },
+        ],
         allowNonCapturedEvents: [
             () => [(_, props) => props.allowNonCapturedEvents],
             (allowNonCapturedEvents: boolean | undefined) => allowNonCapturedEvents ?? false,
@@ -505,16 +537,21 @@ export const infiniteListLogic = kea<infiniteListLogicType>([
                         hasRecentContext(item) && item._recentContext.propertyFilter
                             ? formatPropertyLabel(item._recentContext.propertyFilter, {})
                             : undefined
+                    const pinnedLabel =
+                        hasPinnedContext(item) && item._pinnedContext.propertyFilter
+                            ? formatPropertyLabel(item._pinnedContext.propertyFilter, {})
+                            : undefined
                     return {
                         name: itemGroup?.getName?.(item) || '',
                         posthogName: asPostHogName(itemGroup, item),
                         recentLabel,
+                        pinnedLabel,
                         item: item,
                     }
                 })
 
                 return new Fuse(haystack, {
-                    keys: ['name', 'posthogName', 'recentLabel'],
+                    keys: ['name', 'posthogName', 'recentLabel', 'pinnedLabel'],
                     threshold: 0.3,
                     ignoreLocation: true,
                 })
@@ -565,6 +602,9 @@ export const infiniteListLogic = kea<infiniteListLogicType>([
                 s.topMatchItemsWithSkeletons,
                 s.searchQuery,
                 s.contextFilteredRecentItems,
+                s.contextFilteredPinnedItems,
+                s.pinnedItemsForCurrentGroup,
+                s.topPinnedItems,
                 s.featureFlags,
             ],
             (
@@ -574,22 +614,56 @@ export const infiniteListLogic = kea<infiniteListLogicType>([
                 topMatchItemsWithSkeletons,
                 searchQuery,
                 contextFilteredRecentItems,
+                contextFilteredPinnedItems,
+                pinnedItemsForCurrentGroup,
+                topPinnedItems,
                 featureFlags
             ) => {
                 const isSuggested = listGroupType === TaxonomicFilterGroupType.SuggestedFilters
                 const topMatches = isSuggested ? topMatchItemsWithSkeletons : []
                 const recentsUiEnabled = !!featureFlags[FEATURE_FLAGS.TAXONOMIC_FILTER_RECENTS]
+                const pinnedUiEnabled = !!featureFlags[FEATURE_FLAGS.TAXONOMIC_FILTER_PINNED]
                 const recentPrefix =
                     isSuggested && !searchQuery && recentsUiEnabled
                         ? (contextFilteredRecentItems || []).slice(0, 3)
                         : []
-                const combinedResults = [...recentPrefix, ...localItems.results, ...remoteItems.results, ...topMatches]
+                const pinnedSuggestedPrefix =
+                    isSuggested && !searchQuery && pinnedUiEnabled ? (topPinnedItems || []).slice(0, 3) : []
+                const pinnedGroupPrefix = !isSuggested && pinnedUiEnabled ? pinnedItemsForCurrentGroup || [] : []
+
+                const pinnedValues = new Set(
+                    pinnedGroupPrefix.filter(hasPinnedContext).map((pinnedItem) => {
+                        return `${pinnedItem._pinnedContext.sourceGroupType}::${pinnedItem.name}`
+                    })
+                )
+                const deduplicatedRemoteResults =
+                    pinnedGroupPrefix.length > 0
+                        ? remoteItems.results.filter((remoteItem) => {
+                              if (!remoteItem || isSkeletonItem(remoteItem)) {
+                                  return true
+                              }
+                              const dedupKey = `${listGroupType}::${(remoteItem as Record<string, any>).name}`
+                              return !pinnedValues.has(dedupKey)
+                          })
+                        : remoteItems.results
+
+                const combinedResults = [
+                    ...pinnedSuggestedPrefix,
+                    ...recentPrefix,
+                    ...pinnedGroupPrefix,
+                    ...localItems.results,
+                    ...deduplicatedRemoteResults,
+                    ...topMatches,
+                ]
+                const dedupedCount = remoteItems.count - (remoteItems.results.length - deduplicatedRemoteResults.length)
                 return {
                     results: searchQuery ? promoteMatchingProperties(combinedResults, searchQuery) : combinedResults,
                     count:
+                        pinnedSuggestedPrefix.length +
                         recentPrefix.length +
+                        pinnedGroupPrefix.length +
                         localItems.count +
-                        remoteItems.count +
+                        Math.max(0, dedupedCount) +
                         topMatches.filter((item) => !isSkeletonItem(item)).length,
                     searchQuery: remoteItems.searchQuery || localItems.searchQuery,
                     expandedCount: remoteItems.expandedCount,

@@ -6,7 +6,7 @@ import { BindLogic, useActions, useValues } from 'kea'
 import { CSSProperties, useEffect, useState } from 'react'
 import { List, useListRef } from 'react-window'
 
-import { IconArchive, IconCheck, IconPlus, IconSearch } from '@posthog/icons'
+import { IconArchive, IconCheck, IconPin, IconPlus, IconSearch } from '@posthog/icons'
 import { LemonDivider, LemonTag } from '@posthog/lemon-ui'
 
 import { AutoSizer } from 'lib/components/AutoSizer'
@@ -14,6 +14,7 @@ import { ControlledDefinitionPopover } from 'lib/components/DefinitionPopover/De
 import { definitionPopoverLogic } from 'lib/components/DefinitionPopover/definitionPopoverLogic'
 import { formatPropertyLabel } from 'lib/components/PropertyFilters/utils'
 import { PropertyKeyInfo } from 'lib/components/PropertyKeyInfo'
+import { hasPinnedContext } from 'lib/components/TaxonomicFilter/pinnedTaxonomicFiltersLogic'
 import { hasRecentContext } from 'lib/components/TaxonomicFilter/recentTaxonomicFiltersLogic'
 import { taxonomicFilterLogic } from 'lib/components/TaxonomicFilter/taxonomicFilterLogic'
 import {
@@ -102,6 +103,30 @@ const renderItemContents = ({
     eventNames: string[]
     isActive: boolean
 }): JSX.Element | string => {
+    if (hasPinnedContext(item)) {
+        if (item._pinnedContext.propertyFilter) {
+            const label = formatPropertyLabel(item._pinnedContext.propertyFilter, {})
+            return (
+                <div className="taxonomic-list-row-contents min-w-0">
+                    <IconPin className="text-muted shrink-0 size-3.5 mr-1" data-testid="pin-icon" />
+                    <span className="truncate" title={label}>
+                        {label}
+                    </span>
+                </div>
+            )
+        }
+        const coreDef = getCoreFilterDefinition(item.name, itemGroup.type)
+        const label = coreDef?.label || item.name || ''
+        return (
+            <div className="taxonomic-list-row-contents min-w-0">
+                <IconPin className="text-muted shrink-0 size-3.5 mr-1" data-testid="pin-icon" />
+                <span className="truncate" title={label}>
+                    {label}
+                </span>
+            </div>
+        )
+    }
+
     if (hasRecentContext(item)) {
         if (item._recentContext.propertyFilter) {
             const label = formatPropertyLabel(item._recentContext.propertyFilter, {})
@@ -419,6 +444,7 @@ const InfiniteListRow = ({
     if (item && itemGroup) {
         const isDisabledItem = itemGroup?.getIsDisabled?.(item) ?? false
         const isCrossGroupItem = !!group.isLocalOnly && itemGroup.type !== listGroupType
+        const itemHasPinnedContext = hasPinnedContext(item)
         const itemHasRecentContext = hasRecentContext(item)
         const recentGroup = itemHasRecentContext
             ? taxonomicGroups.find((g) => g.type === TaxonomicFilterGroupType.RecentFilters)
@@ -464,7 +490,11 @@ const InfiniteListRow = ({
                 })}
                 {isCrossGroupItem && (
                     <LemonTag size="small" type="highlight">
-                        {itemHasRecentContext ? `${itemGroup.name} - recent` : itemGroup.name}
+                        {itemHasPinnedContext
+                            ? `${itemGroup.name} - pinned`
+                            : itemHasRecentContext
+                              ? `${itemGroup.name} - recent`
+                              : itemGroup.name}
                     </LemonTag>
                 )}
             </div>
@@ -779,9 +809,10 @@ function resolveItemRendering({
     recentGroup: TaxonomicFilterGroup | undefined
     fallbackGroup: TaxonomicFilterGroup
 }): { listGroupType: TaxonomicFilterGroupType; itemGroup: TaxonomicFilterGroup } {
+    const isPinnedPropertyFilter = hasPinnedContext(item) && item._pinnedContext.propertyFilter
     const isRecentPropertyFilter = hasRecentContext(item) && item._recentContext.propertyFilter
 
-    if (isRecentPropertyFilter) {
+    if (isPinnedPropertyFilter || isRecentPropertyFilter) {
         return {
             listGroupType,
             itemGroup: recentGroup ?? fallbackGroup,
@@ -805,7 +836,12 @@ export function getItemGroup(
 ): TaxonomicFilterGroup {
     let group = defaultGroup
 
-    if (item && hasRecentContext(item)) {
+    if (item && hasPinnedContext(item)) {
+        const itemGroup = groups.find((g) => g.type === item._pinnedContext.sourceGroupType)
+        if (itemGroup) {
+            group = itemGroup
+        }
+    } else if (item && hasRecentContext(item)) {
         const itemGroup = groups.find((g) => g.type === item._recentContext.sourceGroupType)
         if (itemGroup) {
             group = itemGroup

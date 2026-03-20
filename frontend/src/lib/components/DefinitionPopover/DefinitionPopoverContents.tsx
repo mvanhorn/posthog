@@ -11,6 +11,7 @@ import { DefinitionPopover } from 'lib/components/DefinitionPopover/DefinitionPo
 import { DefinitionPopoverState, definitionPopoverLogic } from 'lib/components/DefinitionPopover/definitionPopoverLogic'
 import { ObjectTags } from 'lib/components/ObjectTags/ObjectTags'
 import { PropertyKeyInfo } from 'lib/components/PropertyKeyInfo'
+import { pinnedTaxonomicFiltersLogic } from 'lib/components/TaxonomicFilter/pinnedTaxonomicFiltersLogic'
 import {
     DataWarehousePopoverField,
     DefinitionPopoverRenderer,
@@ -19,6 +20,7 @@ import {
     TaxonomicFilterGroup,
     TaxonomicFilterGroupType,
 } from 'lib/components/TaxonomicFilter/types'
+import { useFeatureFlag } from 'lib/hooks/useFeatureFlag'
 import { IconOpenInNew } from 'lib/lemon-ui/icons'
 import { LemonTextArea } from 'lib/lemon-ui/LemonTextArea/LemonTextArea'
 import { Popover } from 'lib/lemon-ui/Popover'
@@ -704,6 +706,9 @@ export function ControlledDefinitionPopover({
 }: ControlledDefinitionPopoverContentsProps): JSX.Element | null {
     const { state, singularType, definition } = useValues(definitionPopoverLogic)
     const { setDefinition } = useActions(definitionPopoverLogic)
+    const pinnedUiEnabled = useFeatureFlag('TAXONOMIC_FILTER_PINNED')
+    const { isPinned } = useValues(pinnedTaxonomicFiltersLogic)
+    const { pinFilter, unpinFilter } = useActions(pinnedTaxonomicFiltersLogic)
 
     const icon = group.getIcon?.(definition || item)
 
@@ -749,6 +754,20 @@ export function ControlledDefinitionPopover({
                         headerTitle={group.getPopoverHeader?.(item)}
                         editHeaderTitle={`Edit ${singularType}`}
                         icon={icon}
+                        isPinned={
+                            pinnedUiEnabled && value != null && isPinned(group.type as TaxonomicFilterGroupType, value)
+                        }
+                        onTogglePin={
+                            pinnedUiEnabled && value != null
+                                ? () => {
+                                      if (isPinned(group.type as TaxonomicFilterGroupType, value)) {
+                                          unpinFilter(group.type as TaxonomicFilterGroupType, value)
+                                      } else {
+                                          pinFilter(group.type as TaxonomicFilterGroupType, group.name, value, item)
+                                      }
+                                  }
+                                : undefined
+                        }
                     />
                     {state === DefinitionPopoverState.Edit ? <DefinitionEdit /> : customView}
                 </DefinitionPopover.Wrapper>
