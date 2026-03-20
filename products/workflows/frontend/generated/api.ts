@@ -535,6 +535,21 @@ export const hogFlowsMetricsTotalsRetrieve = async (
     })
 }
 
+export const getHogFlowsScheduledRunsRetrieveUrl = (projectId: string, id: string) => {
+    return `/api/projects/${projectId}/hog_flows/${id}/scheduled_runs/`
+}
+
+export const hogFlowsScheduledRunsRetrieve = async (
+    projectId: string,
+    id: string,
+    options?: RequestInit
+): Promise<HogFlowApi> => {
+    return apiMutator<HogFlowApi>(getHogFlowsScheduledRunsRetrieveUrl(projectId, id), {
+        ...options,
+        method: 'GET',
+    })
+}
+
 export const getHogFlowsBulkDeleteCreateUrl = (projectId: string) => {
     return `/api/projects/${projectId}/hog_flows/bulk_delete/`
 }

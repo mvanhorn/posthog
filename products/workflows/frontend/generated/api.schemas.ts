@@ -383,6 +383,7 @@ export interface HogFlowMinimalApi {
     readonly abort_action: string | null
     readonly variables: unknown | null
     readonly billable_action_types: unknown | null
+    readonly schedule_config: unknown | null
 }
 
 export interface PaginatedHogFlowMinimalListApi {
@@ -434,6 +435,7 @@ export interface HogFlowApi {
     readonly abort_action: string | null
     variables?: HogFlowApiVariablesItem[]
     readonly billable_action_types: unknown | null
+    schedule_config?: unknown | null
 }
 
 export type PatchedHogFlowApiVariablesItem = { [key: string]: string }
@@ -461,6 +463,7 @@ export interface PatchedHogFlowApi {
     readonly abort_action?: string | null
     variables?: PatchedHogFlowApiVariablesItem[]
     readonly billable_action_types?: unknown | null
+    schedule_config?: unknown | null
 }
 
 export type MessagingCategoriesListParams = {

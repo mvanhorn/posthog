@@ -15291,6 +15291,7 @@ export namespace Schemas {
       readonly abort_action: string | null;
       variables?: HogFlowVariablesItem[];
       readonly billable_action_types: unknown | null;
+      schedule_config?: unknown | null;
     }
 
     export interface HogFlowMinimal {
@@ -15313,6 +15314,7 @@ export namespace Schemas {
       readonly abort_action: string | null;
       readonly variables: unknown | null;
       readonly billable_action_types: unknown | null;
+      readonly schedule_config: unknown | null;
     }
 
     /**
@@ -22038,6 +22040,7 @@ export namespace Schemas {
       readonly abort_action?: string | null;
       variables?: PatchedHogFlowVariablesItem[];
       readonly billable_action_types?: unknown | null;
+      schedule_config?: unknown | null;
     }
 
     /**

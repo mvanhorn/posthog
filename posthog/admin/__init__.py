@@ -140,6 +140,7 @@ def register_all_admin():
     admin.site.register(DuckgresServer, DuckgresServerAdmin)
     admin.site.register(DuckLakeCatalog, DuckLakeCatalogAdmin)
     admin.site.register(HogFlow, HogFlowAdmin)
+
     admin.site.register(HogFunction, HogFunctionAdmin)
     admin.site.register(EventIngestionRestrictionConfig, EventIngestionRestrictionConfigAdmin)
     admin.site.register(Link, LinkAdmin)
