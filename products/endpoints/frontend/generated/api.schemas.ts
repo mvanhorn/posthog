@@ -2555,6 +2555,11 @@ export interface RetentionValueApi {
 }
 
 export interface RetentionResultApi {
+    /**
+     * Human-readable breakdown label, e.g. cohort name
+     * @nullable
+     */
+    breakdown?: string | null
     /** Optional breakdown value for retention cohorts */
     breakdown_value?: string | number | null
     date: string
