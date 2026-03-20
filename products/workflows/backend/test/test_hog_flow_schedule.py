@@ -333,4 +333,5 @@ class TestHogFlowScheduleAPI(APIBaseTest):
         workflow = self._create_batch_workflow(schedule_config=schedule_config)
 
         hog_flow = HogFlow.objects.get(id=workflow["id"])
+        assert hog_flow.schedule_config is not None
         assert hog_flow.schedule_config["timezone"] == "US/Eastern"

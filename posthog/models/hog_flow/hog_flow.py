@@ -92,9 +92,9 @@ def hog_flow_saved(sender, instance: HogFlow, created, **kwargs):
     reload_hog_flows_on_workers(team_id=instance.team_id, hog_flow_ids=[str(instance.id)])
 
     try:
-        from posthog.api.hog_flow import _sync_schedule_for_hog_flow
+        from products.workflows.backend.utils.schedule_sync import sync_schedule
 
-        _sync_schedule_for_hog_flow(instance, instance.team_id)
+        sync_schedule(instance, instance.team_id)
     except Exception:
         logger.warning(
             "Failed to sync schedule for HogFlow",

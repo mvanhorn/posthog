@@ -8,7 +8,7 @@ import posthog.models.utils
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("posthog", "1057_hogflow_schedule_config"),
+        ("posthog", "1061_hogflow_schedule_config"),
         ("workflows", "0002_hogflowbatchjob_scheduled_at"),
     ]
 

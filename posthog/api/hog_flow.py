@@ -6,7 +6,6 @@ from django.db.models import QuerySet
 
 import structlog
 import posthoganalytics
-from dateutil.parser import isoparse
 from django_filters import BaseInFilter, CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
@@ -41,7 +40,7 @@ from posthog.plugins.plugin_server_api import create_hog_flow_invocation_test
 
 from products.workflows.backend.models.hog_flow_batch_job import HogFlowBatchJob
 from products.workflows.backend.models.hog_flow_scheduled_run import HogFlowScheduledRun
-from products.workflows.backend.utils.rrule_utils import compute_next_occurrences, validate_rrule
+from products.workflows.backend.utils.rrule_utils import validate_rrule
 
 logger = structlog.get_logger(__name__)
 
@@ -211,42 +210,6 @@ class HogFlowScheduledRunSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-def _sync_schedule_for_hog_flow(hog_flow: HogFlow, team_id: int) -> None:
-    """
-    Manage the next pending HogFlowScheduledRun based on schedule_config.
-    Deletes any existing pending run and creates a new one if the workflow is active.
-    """
-    schedule_config = hog_flow.schedule_config
-
-    # Always clean up existing pending run
-    HogFlowScheduledRun.objects.filter(hog_flow=hog_flow, status=HogFlowScheduledRun.Status.PENDING).delete()
-
-    if not schedule_config or hog_flow.status != HogFlow.State.ACTIVE:
-        return
-
-    rrule_str = schedule_config.get("rrule")
-    starts_at_str = schedule_config.get("starts_at")
-    tz = schedule_config.get("timezone", "UTC")
-
-    if not rrule_str or not starts_at_str:
-        return
-
-    starts_at = isoparse(starts_at_str)
-    occurrences = compute_next_occurrences(
-        rrule_string=rrule_str,
-        starts_at=starts_at,
-        timezone_str=tz,
-        count=1,
-    )
-    if occurrences:
-        HogFlowScheduledRun.objects.create(
-            team_id=team_id,
-            hog_flow=hog_flow,
-            run_at=occurrences[0],
-            status=HogFlowScheduledRun.Status.PENDING,
-        )
-
-
 class HogFlowMinimalSerializer(serializers.ModelSerializer):
     created_by = UserBasicSerializer(read_only=True)
 
@@ -376,24 +339,12 @@ class HogFlowSerializer(HogFlowMinimalSerializer):
                 logger.warning("Invalid RRULE encountered during validation", rrule=rrule_str, error=str(e))
                 raise serializers.ValidationError({"schedule_config": {"rrule": "Invalid RRULE."}})
 
-            from dateutil.rrule import (
-                HOURLY,
-                MINUTELY,
-                SECONDLY,
-                rrule as rrule_cls,
-                rrulestr as rrulestr_parse,
-            )
-
-            parsed_rule = rrulestr_parse(rrule_str)
-            if isinstance(parsed_rule, rrule_cls):
-                if parsed_rule._freq in (MINUTELY, SECONDLY):
-                    raise serializers.ValidationError(
-                        {"schedule_config": {"rrule": "Schedules must run at most once per hour."}}
-                    )
-                if parsed_rule._freq == HOURLY and (parsed_rule._interval or 1) < 1:
-                    raise serializers.ValidationError(
-                        {"schedule_config": {"rrule": "Schedules must run at most once per hour."}}
-                    )
+            # Enforce minimum interval of 1 hour
+            rrule_upper = rrule_str.upper()
+            if "FREQ=MINUTELY" in rrule_upper or "FREQ=SECONDLY" in rrule_upper:
+                raise serializers.ValidationError(
+                    {"schedule_config": {"rrule": "Schedules must run at most once per hour."}}
+                )
 
             if not schedule_config.get("starts_at"):
                 raise serializers.ValidationError({"schedule_config": {"starts_at": "Start date is required."}})
