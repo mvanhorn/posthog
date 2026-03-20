@@ -14,6 +14,7 @@ import { actionsModel } from '~/models/actionsModel'
 import { type AnyPropertyFilter, AvailableFeature, PropertyFilterType, PropertyOperator } from '~/types'
 
 import { infiniteListLogic } from './infiniteListLogic'
+import { pinnedTaxonomicFiltersLogic } from './pinnedTaxonomicFiltersLogic'
 import { recentTaxonomicFiltersLogic } from './recentTaxonomicFiltersLogic'
 import { TaxonomicFilter } from './TaxonomicFilter'
 
@@ -423,3 +424,179 @@ SuggestedFiltersFiveRecentsWithTruncation.args = {
 }
 SuggestedFiltersFiveRecentsWithTruncation.parameters = SUGGESTED_FILTERS_PARAMETERS
 SuggestedFiltersFourRecents.parameters = SUGGESTED_FILTERS_PARAMETERS
+
+const PINNED_ITEMS = [
+    {
+        groupType: TaxonomicFilterGroupType.EventProperties,
+        groupName: 'Event properties',
+        value: '$browser',
+        item: { name: '$browser' },
+        count: 12,
+        propertyFilter: propertyFilter({
+            type: PropertyFilterType.Event,
+            key: '$browser',
+            operator: PropertyOperator.Exact,
+            value: 'Chrome',
+        }),
+    },
+    {
+        groupType: TaxonomicFilterGroupType.Events,
+        groupName: 'Events',
+        value: 'signed up',
+        item: { name: 'signed up', id: 'a' },
+        count: 7,
+    },
+    {
+        groupType: TaxonomicFilterGroupType.EventProperties,
+        groupName: 'Event properties',
+        value: '$os',
+        item: { name: '$os' },
+        count: 3,
+        propertyFilter: propertyFilter({
+            type: PropertyFilterType.Event,
+            key: '$os',
+            operator: PropertyOperator.Exact,
+            value: 'Mac OS X',
+        }),
+    },
+    {
+        groupType: TaxonomicFilterGroupType.Events,
+        groupName: 'Events',
+        value: 'viewed insights',
+        item: { name: 'viewed insights', id: 'b' },
+        count: 1,
+    },
+]
+
+function SeedPinned({ count }: { count: number }): null {
+    useMountedLogic(pinnedTaxonomicFiltersLogic)
+
+    useOnMountEffect(() => {
+        pinnedTaxonomicFiltersLogic.actions.clearPinnedFilters()
+        for (const pinned of PINNED_ITEMS.slice(0, count)) {
+            pinnedTaxonomicFiltersLogic.actions.pinFilter(
+                pinned.groupType,
+                pinned.groupName,
+                pinned.value,
+                pinned.item,
+                MOCK_TEAM_ID,
+                pinned.propertyFilter
+            )
+            for (let i = 1; i < pinned.count; i++) {
+                pinnedTaxonomicFiltersLogic.actions.incrementPinCount(
+                    pinned.groupType,
+                    pinned.value,
+                    pinned.propertyFilter
+                )
+            }
+        }
+    })
+
+    return null
+}
+
+const PINNED_FILTERS_PARAMETERS = {
+    featureFlags: [FEATURE_FLAGS.TAXONOMIC_FILTER_PINNED, FEATURE_FLAGS.TAXONOMIC_FILTER_RECENTS],
+    testOptions: { waitForSelector: '.taxonomic-infinite-list' },
+}
+
+export const PinnedItemsInEventProperties: StoryFn<typeof TaxonomicFilter> = (args) => {
+    return (
+        <div className="w-fit border rounded p-2 bg-surface-primary">
+            <SeedPinned count={3} />
+            <TaxonomicFilter {...args} />
+        </div>
+    )
+}
+PinnedItemsInEventProperties.args = {
+    taxonomicFilterLogicKey: 'pinned-event-properties',
+    taxonomicGroupTypes: [TaxonomicFilterGroupType.EventProperties, TaxonomicFilterGroupType.Events],
+}
+PinnedItemsInEventProperties.parameters = PINNED_FILTERS_PARAMETERS
+
+export const PinnedItemsInSuggestedFilters: StoryFn<typeof TaxonomicFilter> = (args) => {
+    return (
+        <div className="w-fit border rounded p-2 bg-surface-primary">
+            <SeedPinned count={4} />
+            <SeedRecents count={3} />
+            <TaxonomicFilter {...args} />
+        </div>
+    )
+}
+PinnedItemsInSuggestedFilters.args = {
+    ...SUGGESTED_FILTERS_ARGS,
+    taxonomicFilterLogicKey: 'pinned-suggested-filters',
+}
+PinnedItemsInSuggestedFilters.parameters = PINNED_FILTERS_PARAMETERS
+
+export const PinnedOnlyNoRecents: StoryFn<typeof TaxonomicFilter> = (args) => {
+    return (
+        <div className="w-fit border rounded p-2 bg-surface-primary">
+            <SeedPinned count={2} />
+            <SeedRecents count={0} />
+            <TaxonomicFilter {...args} />
+        </div>
+    )
+}
+PinnedOnlyNoRecents.args = {
+    ...SUGGESTED_FILTERS_ARGS,
+    taxonomicFilterLogicKey: 'pinned-only-no-recents',
+}
+PinnedOnlyNoRecents.parameters = PINNED_FILTERS_PARAMETERS
+
+export const PinnedFlagDisabled: StoryFn<typeof TaxonomicFilter> = (args) => {
+    return (
+        <div className="w-fit border rounded p-2 bg-surface-primary">
+            <SeedPinned count={3} />
+            <TaxonomicFilter {...args} />
+        </div>
+    )
+}
+PinnedFlagDisabled.args = {
+    taxonomicFilterLogicKey: 'pinned-flag-disabled',
+    taxonomicGroupTypes: [TaxonomicFilterGroupType.EventProperties, TaxonomicFilterGroupType.Events],
+}
+PinnedFlagDisabled.parameters = {
+    testOptions: { waitForSelector: '.taxonomic-infinite-list' },
+}
+
+export const PinnedWithPropertyFilters: StoryFn<typeof TaxonomicFilter> = (args) => {
+    return (
+        <div className="w-fit border rounded p-2 bg-surface-primary">
+            <SeedPinned count={3} />
+            <TaxonomicFilter {...args} />
+        </div>
+    )
+}
+PinnedWithPropertyFilters.args = {
+    taxonomicFilterLogicKey: 'pinned-property-filters',
+    taxonomicGroupTypes: [
+        TaxonomicFilterGroupType.EventProperties,
+        TaxonomicFilterGroupType.PersonProperties,
+        TaxonomicFilterGroupType.Events,
+    ],
+}
+PinnedWithPropertyFilters.parameters = PINNED_FILTERS_PARAMETERS
+
+export const PinnedAndRecentsInSuggestedColumnar: StoryFn<typeof TaxonomicFilter> = (args) => {
+    useMountedLogic(actionsModel)
+
+    return (
+        <div className="w-fit border rounded p-2 bg-surface-primary">
+            <SeedPinned count={4} />
+            <SeedRecents count={5} />
+            <TaxonomicFilter {...args} />
+        </div>
+    )
+}
+PinnedAndRecentsInSuggestedColumnar.args = {
+    taxonomicFilterLogicKey: 'pinned-recents-columnar',
+    taxonomicGroupTypes: [
+        TaxonomicFilterGroupType.SuggestedFilters,
+        TaxonomicFilterGroupType.Events,
+        TaxonomicFilterGroupType.Actions,
+        TaxonomicFilterGroupType.EventProperties,
+        TaxonomicFilterGroupType.PersonProperties,
+    ],
+}
+PinnedAndRecentsInSuggestedColumnar.parameters = PINNED_FILTERS_PARAMETERS
