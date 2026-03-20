@@ -215,6 +215,12 @@ class User(AbstractUser, UUIDTClassicModel, ModelActivityMixin):
 
     objects: UserManager = UserManager()
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._original_is_active = instance.is_active
+        return instance
+
     @property
     def is_superuser(self) -> bool:
         return self.is_staff

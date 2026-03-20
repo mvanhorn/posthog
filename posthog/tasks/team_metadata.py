@@ -140,6 +140,26 @@ def clear_team_metadata_cache_on_delete(sender: type[Team], instance: Team, **kw
     clear_team_metadata_cache(instance, kinds=kinds)
 
 
+@receiver(pre_delete, sender=Team)
+def clear_project_secret_api_key_cache_on_delete(sender: type[Team], instance: Team, **kwargs: Any) -> None:
+    """Clear auth token cache entries for project secret API keys when a Team is deleted.
+
+    Captures PSAK secure_values in pre_delete (before cascade deletes them),
+    then defers the Redis invalidation to transaction.on_commit so we don't
+    block the delete transaction on a Redis round-trip or invalidate on rollback.
+    """
+    secure_values = list(
+        instance.project_secret_api_keys.filter(secure_value__isnull=False).values_list("secure_value", flat=True)
+    )
+
+    if not secure_values:
+        return
+
+    from posthog.storage.team_access_cache import token_auth_cache
+
+    transaction.on_commit(lambda: token_auth_cache.invalidate_tokens(secure_values))
+
+
 @shared_task(ignore_result=True, queue=CeleryQueue.DEFAULT.value)
 def cleanup_stale_expiry_tracking_task() -> None:
     """

@@ -614,8 +614,17 @@ pub struct Config {
     #[envconfig(from = "TEAM_NEGATIVE_CACHE_TTL_SECONDS", default = "300")]
     pub team_negative_cache_ttl_seconds: u64,
 
+    // In-memory negative cache for invalid auth tokens (personal API keys + secret tokens).
+    // Prevents repeated PG lookups for tokens that fail authentication.
+    #[envconfig(from = "AUTH_NEGATIVE_CACHE_CAPACITY", default = "10000")]
+    pub auth_negative_cache_capacity: u64,
+
+    #[envconfig(from = "AUTH_NEGATIVE_CACHE_TTL_SECONDS", default = "300")]
+    pub auth_negative_cache_ttl_seconds: u64,
+
     #[envconfig(from = "SERVICE_MODE", default = "all")]
     pub service_mode: ServiceMode,
+
 }
 
 /// Thread counts for Tokio (async I/O) and Rayon (CPU-bound parallel evaluation).
@@ -821,6 +830,8 @@ impl Config {
             team_negative_cache_capacity: 10_000,
             team_negative_cache_ttl_seconds: 300,
             service_mode: ServiceMode::All,
+            auth_negative_cache_capacity: 10_000,
+            auth_negative_cache_ttl_seconds: 300,
         }
     }
 
