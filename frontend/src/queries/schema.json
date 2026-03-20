@@ -29757,6 +29757,10 @@
         "RetentionResult": {
             "additionalProperties": false,
             "properties": {
+                "breakdown": {
+                    "description": "Human-readable breakdown label, e.g. cohort name",
+                    "type": ["string", "null"]
+                },
                 "breakdown_value": {
                     "description": "Optional breakdown value for retention cohorts",
                     "type": ["string", "number", "null"]

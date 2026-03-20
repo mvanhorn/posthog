@@ -20,6 +20,7 @@ export interface ProcessedRetentionPayload {
     people_url: string
     values: ProcessedRetentionValue[]
     breakdown_value?: string | number | null
+    breakdown?: string | null
 }
 
 export interface RetentionTableRow {
@@ -27,6 +28,7 @@ export interface RetentionTableRow {
     cohortSize: number
     values: ProcessedRetentionValue[]
     breakdown_value?: string | number | null
+    breakdown?: string | null
 }
 
 export interface RetentionTrendPayload {
@@ -36,6 +38,7 @@ export interface RetentionTrendPayload {
     labels: string[]
     index: number
     breakdown_value?: string | number | null
+    breakdown?: string | null
 }
 
 export interface RetentionTablePeoplePayload {

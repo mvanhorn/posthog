@@ -63,7 +63,7 @@ export function ActionsHorizontalBar({
                             allCohorts?.results,
                             formatPropertyValueForDisplay,
                             undefined,
-                            item.label
+                            item.breakdown
                         )
                     }),
                     compareLabels: visibleResults.map((item) => item.compare_label),

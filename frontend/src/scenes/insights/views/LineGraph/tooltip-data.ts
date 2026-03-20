@@ -24,6 +24,7 @@ export function createTooltipData(
                     pointDataset?.breakdownLabels?.[dp.dataIndex] ??
                     pointDataset?.breakdownValues?.[dp.dataIndex] ??
                     undefined,
+                breakdown: pointDataset?.breakdown ?? undefined,
                 compare_label: pointDataset?.compare_label ?? pointDataset?.compareLabels?.[dp.dataIndex] ?? undefined,
                 action: pointDataset?.action ?? pointDataset?.actions?.[dp.dataIndex] ?? undefined,
                 label: pointDataset?.label ?? pointDataset.labels?.[dp.dataIndex] ?? undefined,

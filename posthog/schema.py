@@ -6295,6 +6295,7 @@ class RetentionResult(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    breakdown: str | None = Field(default=None, description="Human-readable breakdown label, e.g. cohort name")
     breakdown_value: str | float | None = Field(
         default=None, description="Optional breakdown value for retention cohorts"
     )

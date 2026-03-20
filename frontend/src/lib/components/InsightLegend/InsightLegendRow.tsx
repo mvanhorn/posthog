@@ -61,7 +61,9 @@ export function InsightLegendRow({ item }: InsightLegendRowProps): JSX.Element {
         item.breakdown_value,
         breakdownFilter,
         allCohorts.results,
-        formatPropertyValueForDisplay
+        formatPropertyValueForDisplay,
+        undefined,
+        item.breakdown
     )
 
     const isPrevious = !!item.compare && item.compare_label === 'previous'

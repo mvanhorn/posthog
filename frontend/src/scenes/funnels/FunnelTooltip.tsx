@@ -61,7 +61,9 @@ export function FunnelTooltip({
                         series.breakdown_value,
                         breakdownFilter,
                         allCohorts.results,
-                        formatPropertyValueForDisplay
+                        formatPropertyValueForDisplay,
+                        undefined,
+                        series.breakdown?.toString()
                     )}
                 </strong>
             </LemonRow>

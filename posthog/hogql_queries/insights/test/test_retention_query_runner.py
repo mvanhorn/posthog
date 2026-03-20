@@ -7358,6 +7358,120 @@ class TestClickhouseRetentionGroupAggregation(ClickhouseTestMixin, APIBaseTest):
         # Note: This validates the query runs successfully with Month period + 24h windows + first-ever
         self.assertIsInstance(result, list)
 
+    def test_cohort_breakdown_includes_breakdown_field_with_cohort_name(self):
+        cohort = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "age",
+                            "operator": "exact",
+                            "value": ["25"],
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="Young users",
+        )
+
+        _create_person(team_id=self.team.pk, distinct_ids=["person1"], properties={"age": "25"})
+        _create_events(self.team, [("person1", _date(0))], "$pageview")
+        _create_events(self.team, [("person1", _date(1))], "$pageview")
+
+        flush_persons_and_events()
+        cohort.calculate_people_ch(pending_version=0)
+
+        result = self.run_query(
+            query={
+                "dateRange": {"date_from": _date(0), "date_to": _date(5)},
+                "retentionFilter": {
+                    "period": "Day",
+                    "totalIntervals": 5,
+                    "targetEntity": {"id": "$pageview", "name": "$pageview", "type": TREND_FILTER_TYPE_EVENTS},
+                    "returningEntity": {"id": "$pageview", "name": "$pageview", "type": "events"},
+                },
+                "breakdownFilter": {
+                    "breakdown": [cohort.pk],
+                    "breakdown_type": "cohort",
+                },
+            }
+        )
+
+        cohort_results = [r for r in result if r.get("breakdown_value") == str(cohort.pk)]
+        assert len(cohort_results) > 0
+        for entry in cohort_results:
+            assert entry["breakdown"] == "Young users"
+
+    def test_cohort_breakdown_includes_breakdown_field_for_multiple_cohorts(self):
+        cohort1 = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "age",
+                            "operator": "exact",
+                            "value": ["25"],
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="Young users",
+        )
+        cohort2 = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "age",
+                            "operator": "exact",
+                            "value": ["40"],
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="Mature users",
+        )
+
+        _create_person(team_id=self.team.pk, distinct_ids=["person1"], properties={"age": "25"})
+        _create_person(team_id=self.team.pk, distinct_ids=["person2"], properties={"age": "40"})
+        _create_events(self.team, [("person1", _date(0)), ("person2", _date(0))], "$pageview")
+        _create_events(self.team, [("person1", _date(1)), ("person2", _date(1))], "$pageview")
+
+        flush_persons_and_events()
+        cohort1.calculate_people_ch(pending_version=0)
+        cohort2.calculate_people_ch(pending_version=0)
+
+        result = self.run_query(
+            query={
+                "dateRange": {"date_from": _date(0), "date_to": _date(5)},
+                "retentionFilter": {
+                    "period": "Day",
+                    "totalIntervals": 5,
+                    "targetEntity": {"id": "$pageview", "name": "$pageview", "type": TREND_FILTER_TYPE_EVENTS},
+                    "returningEntity": {"id": "$pageview", "name": "$pageview", "type": "events"},
+                },
+                "breakdownFilter": {
+                    "breakdown": [cohort1.pk, cohort2.pk],
+                    "breakdown_type": "cohort",
+                },
+            }
+        )
+
+        cohort1_results = [r for r in result if r.get("breakdown_value") == str(cohort1.pk)]
+        cohort2_results = [r for r in result if r.get("breakdown_value") == str(cohort2.pk)]
+        assert len(cohort1_results) > 0
+        assert len(cohort2_results) > 0
+        for entry in cohort1_results:
+            assert entry["breakdown"] == "Young users"
+        for entry in cohort2_results:
+            assert entry["breakdown"] == "Mature users"
+
     # TRICKY: for later if/when we want a different ranking logic for breakdowns
     # def test_retention_breakdown_ranking_by_unique_users(self):
     #     # This test validates that breakdown ranking is based on unique users, not sum of cohort sizes.

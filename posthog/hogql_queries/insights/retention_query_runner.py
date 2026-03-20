@@ -42,7 +42,7 @@ from posthog.hogql_queries.utils.query_date_range import QueryDateRangeWithInter
 from posthog.models import Team
 from posthog.models.action.action import Action
 from posthog.models.filters.mixins.utils import cached_property
-from posthog.queries.breakdown_props import ALL_USERS_COHORT_ID
+from posthog.queries.breakdown_props import ALL_USERS_COHORT_ID, get_breakdown_cohort_names
 from posthog.queries.util import correct_result_for_sampling
 
 DEFAULT_INTERVAL = IntervalType("day")
@@ -1361,6 +1361,11 @@ class RetentionQueryRunner(AnalyticsQueryRunner[RetentionQueryResponse]):
             if other_values:
                 ordered_breakdown_keys.append(BREAKDOWN_OTHER_STRING_LABEL)
 
+            cohort_names: dict[int, str] = {}
+            if self.query.breakdownFilter and self.query.breakdownFilter.breakdown_type == "cohort":
+                cohort_ids = [int(bv) for bv in ordered_breakdown_keys if str(bv).isdigit()]
+                cohort_names = get_breakdown_cohort_names(cohort_ids, self.team)
+
             for breakdown_value in ordered_breakdown_keys:
                 count_intervals_data: dict[int, dict[int, float]] = aggregated_count_data.get(breakdown_value, {})
                 value_intervals_data: dict[int, dict[int, float]] = aggregated_value_data.get(breakdown_value, {})
@@ -1383,14 +1388,18 @@ class RetentionQueryRunner(AnalyticsQueryRunner[RetentionQueryResponse]):
                         for return_interval in range(self.lookahead_period_count)
                     ]
 
-                    breakdown_results.append(
-                        {
-                            "values": values,
-                            "label": f"{self.query_date_range.interval_name.title()} {start_interval}",
-                            "date": self.get_date(start_interval),
-                            "breakdown_value": breakdown_value,
-                        }
-                    )
+                    result_entry: dict[str, Any] = {
+                        "values": values,
+                        "label": f"{self.query_date_range.interval_name.title()} {start_interval}",
+                        "date": self.get_date(start_interval),
+                        "breakdown_value": breakdown_value,
+                    }
+                    if cohort_names:
+                        try:
+                            result_entry["breakdown"] = cohort_names.get(int(breakdown_value), str(breakdown_value))
+                        except (ValueError, TypeError):
+                            result_entry["breakdown"] = str(breakdown_value)
+                    breakdown_results.append(result_entry)
 
                 final_results.extend(breakdown_results)
 

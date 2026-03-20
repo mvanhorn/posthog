@@ -217,7 +217,7 @@ function CollapsibleBreakdownSection({
                                                                     [],
                                                                     undefined,
                                                                     0,
-                                                                    undefined
+                                                                    breakdownResult.breakdown?.toString()
                                                                 )}
                                                             </td>
                                                             <td
@@ -256,7 +256,7 @@ function CollapsibleBreakdownSection({
                                                                     [],
                                                                     undefined,
                                                                     0,
-                                                                    undefined
+                                                                    breakdownResult.breakdown?.toString()
                                                                 )}
                                                             </td>
 

@@ -7295,3 +7295,116 @@ class TestTrendsQueryRunner(ClickhouseTestMixin, APIBaseTest):
 
         assert len(response.results) == 1
         assert response.results[0]["count"] == expected_count
+
+    def test_cohort_breakdown_includes_breakdown_field_with_cohort_name(self):
+        self._create_test_events()
+        cohort = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "name",
+                            "value": "p1",
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="cohort p1",
+        )
+        cohort.calculate_people_ch(pending_version=0)
+
+        response = self._run_trends_query(
+            "2020-01-09",
+            "2020-01-20",
+            IntervalType.DAY,
+            [EventsNode(event="$pageview")],
+            None,
+            BreakdownFilter(breakdown_type=BreakdownType.COHORT, breakdown=[cohort.pk]),
+        )
+
+        assert len(response.results) == 1
+        assert response.results[0]["breakdown_value"] == cohort.pk
+        assert response.results[0]["breakdown"] == "cohort p1"
+
+    def test_cohort_breakdown_includes_breakdown_field_for_multiple_cohorts(self):
+        self._create_test_events()
+        cohort1 = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "name",
+                            "value": "p1",
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="cohort p1",
+        )
+        cohort1.calculate_people_ch(pending_version=0)
+        cohort2 = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "name",
+                            "value": "p2",
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="cohort p2",
+        )
+        cohort2.calculate_people_ch(pending_version=0)
+
+        response = self._run_trends_query(
+            "2020-01-09",
+            "2020-01-20",
+            IntervalType.DAY,
+            [EventsNode(event="$pageview")],
+            None,
+            BreakdownFilter(breakdown_type=BreakdownType.COHORT, breakdown=[cohort1.pk, cohort2.pk]),
+        )
+
+        assert len(response.results) == 2
+        breakdown_by_value = {r["breakdown_value"]: r for r in response.results}
+        assert breakdown_by_value[cohort1.pk]["breakdown"] == "cohort p1"
+        assert breakdown_by_value[cohort2.pk]["breakdown"] == "cohort p2"
+
+    def test_cohort_breakdown_includes_breakdown_field_for_all_users_cohort(self):
+        self._create_test_events()
+        cohort = Cohort.objects.create(
+            team=self.team,
+            groups=[
+                {
+                    "properties": [
+                        {
+                            "key": "name",
+                            "value": "p1",
+                            "type": "person",
+                        }
+                    ]
+                }
+            ],
+            name="cohort p1",
+        )
+        cohort.calculate_people_ch(pending_version=0)
+
+        response = self._run_trends_query(
+            "2020-01-09",
+            "2020-01-20",
+            IntervalType.DAY,
+            [EventsNode(event="$pageview")],
+            None,
+            BreakdownFilter(breakdown_type=BreakdownType.COHORT, breakdown=[cohort.pk, "all"]),
+        )
+
+        assert len(response.results) == 2
+        all_users_result = next(r for r in response.results if r["breakdown_value"] == "all")
+        assert all_users_result["breakdown"] == "all users"

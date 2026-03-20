@@ -378,12 +378,28 @@ export const retentionLogic = kea<retentionLogicType>([
             },
         ],
 
+        breakdownLabelsMap: [
+            (s) => [s.results],
+            (results): Record<string, string> => {
+                if (!results || results.length === 0) {
+                    return {}
+                }
+                const map: Record<string, string> = {}
+                for (const result of results) {
+                    if ('breakdown_value' in result && 'breakdown' in result && result.breakdown) {
+                        map[String(result.breakdown_value)] = result.breakdown
+                    }
+                }
+                return map
+            },
+        ],
         breakdownDisplayNames: [
-            (s) => [s.breakdownValues, s.breakdownFilter, s.cohortsById],
+            (s) => [s.breakdownValues, s.breakdownFilter, s.cohortsById, s.breakdownLabelsMap],
             (
                 breakdownValues: (string | number | boolean | null)[],
                 breakdownFilter: any,
-                cohortsById: Partial<Record<string | number, CohortType>>
+                cohortsById: Partial<Record<string | number, CohortType>>,
+                breakdownLabelsMap: Record<string, string>
             ): Record<string, string> => {
                 return breakdownValues.reduce(
                     (acc, breakdownValue, breakdownIndex) => {
@@ -404,7 +420,8 @@ export const retentionLogic = kea<retentionLogicType>([
                                 breakdownFilter,
                                 cohorts,
                                 undefined,
-                                breakdownIndex
+                                breakdownIndex,
+                                breakdownLabelsMap[key]
                             )
                             acc[key] = formattedLabel
                         }

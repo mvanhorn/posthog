@@ -98,13 +98,17 @@ export function FunnelStepsTable(): JSX.Element | null {
                             valueA,
                             breakdownFilter,
                             allCohorts.results,
-                            formatPropertyValueForDisplay
+                            formatPropertyValueForDisplay,
+                            undefined,
+                            a.breakdown?.toString()
                         )
                         const labelB = formatBreakdownLabel(
                             valueB,
                             breakdownFilter,
                             allCohorts.results,
-                            formatPropertyValueForDisplay
+                            formatPropertyValueForDisplay,
+                            undefined,
+                            b.breakdown?.toString()
                         )
                         return compareFn()(labelA, labelB)
                     },
@@ -127,7 +131,9 @@ export function FunnelStepsTable(): JSX.Element | null {
                                     value,
                                     breakdownFilter,
                                     allCohorts.results,
-                                    formatPropertyValueForDisplay
+                                    formatPropertyValueForDisplay,
+                                    undefined,
+                                    breakdown.breakdown?.toString()
                                 )}
                                 {showCustomizationIcon && (
                                     <LemonColorButton

@@ -47,7 +47,14 @@ function FunnelTooltipContent({
                     {series.breakdown_value && (
                         <>
                             <span className="mx-1">•</span>
-                            {formatBreakdownLabel(series.breakdown_value, null, [], (value) => value?.toString() || '')}
+                            {formatBreakdownLabel(
+                                series.breakdown_value,
+                                null,
+                                [],
+                                (value) => value?.toString() || '',
+                                undefined,
+                                series.breakdown?.toString()
+                            )}
                         </>
                     )}
                 </strong>

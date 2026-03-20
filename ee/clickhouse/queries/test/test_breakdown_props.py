@@ -14,8 +14,11 @@ from posthog.models.entity import Entity
 from posthog.models.filters import Filter
 from posthog.models.group.util import create_group
 from posthog.queries.breakdown_props import (
+    ALL_USERS_COHORT_ID,
+    NOT_IN_COHORT_ID,
     _to_bucketing_expression,
     get_breakdown_cohort_name,
+    get_breakdown_cohort_names,
     get_breakdown_prop_values,
 )
 from posthog.queries.trends.util import process_math
@@ -535,6 +538,70 @@ class TestBreakdownProps(ClickhouseTestMixin, APIBaseTest):
 
         with pytest.raises(Cohort.DoesNotExist):
             get_breakdown_cohort_name(other_cohort.pk, self.team)
+
+    def test_get_breakdown_cohort_names_returns_regular_cohort_name(self):
+        cohort = Cohort.objects.create(
+            team=self.team,
+            name="paying users",
+            groups=[{"properties": [{"key": "$browser", "value": "Chrome", "type": "person"}]}],
+        )
+
+        result = get_breakdown_cohort_names([cohort.pk], self.team)
+
+        assert result == {cohort.pk: "paying users"}
+
+    def test_get_breakdown_cohort_names_handles_all_users_cohort(self):
+        result = get_breakdown_cohort_names([ALL_USERS_COHORT_ID], self.team)
+
+        assert result == {ALL_USERS_COHORT_ID: "all users"}
+
+    def test_get_breakdown_cohort_names_handles_not_in_cohort(self):
+        result = get_breakdown_cohort_names([NOT_IN_COHORT_ID], self.team)
+
+        assert result == {NOT_IN_COHORT_ID: "Not in cohort"}
+
+    def test_get_breakdown_cohort_names_handles_multiple_ids_in_batch(self):
+        cohort1 = Cohort.objects.create(
+            team=self.team,
+            name="beta testers",
+            groups=[{"properties": [{"key": "$browser", "value": "Firefox", "type": "person"}]}],
+        )
+        cohort2 = Cohort.objects.create(
+            team=self.team,
+            name="power users",
+            groups=[{"properties": [{"key": "$browser", "value": "Chrome", "type": "person"}]}],
+        )
+
+        result = get_breakdown_cohort_names(
+            [ALL_USERS_COHORT_ID, cohort1.pk, cohort2.pk, NOT_IN_COHORT_ID],
+            self.team,
+        )
+
+        assert result == {
+            ALL_USERS_COHORT_ID: "all users",
+            cohort1.pk: "beta testers",
+            cohort2.pk: "power users",
+            NOT_IN_COHORT_ID: "Not in cohort",
+        }
+
+    def test_get_breakdown_cohort_names_returns_empty_dict_for_empty_input(self):
+        result = get_breakdown_cohort_names([], self.team)
+
+        assert result == {}
+
+    def test_get_breakdown_cohort_names_excludes_cross_project_cohorts(self):
+        from posthog.models.organization import Organization
+
+        _, _, other_team = Organization.objects.bootstrap(self.user, name="another org")
+        other_cohort = Cohort.objects.create(
+            team=other_team,
+            name="hidden cohort",
+            groups=[{"properties": [{"key": "$browser", "value": "Safari", "type": "person"}]}],
+        )
+
+        result = get_breakdown_cohort_names([other_cohort.pk], self.team)
+
+        assert other_cohort.pk not in result
 
 
 @pytest.mark.parametrize(

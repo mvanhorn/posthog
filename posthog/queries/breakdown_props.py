@@ -383,12 +383,25 @@ def _parse_breakdown_cohorts(cohorts: list[Cohort], hogql_context: HogQLContext)
     return queries, params
 
 
+def get_breakdown_cohort_names(cohort_ids: list[int], team: Team) -> dict[int, str]:
+    names: dict[int, str] = {}
+    db_ids: list[int] = []
+    for cid in cohort_ids:
+        if cid == ALL_USERS_COHORT_ID:
+            names[cid] = "all users"
+        elif cid == NOT_IN_COHORT_ID:
+            names[cid] = "Not in cohort"
+        else:
+            db_ids.append(cid)
+    for cohort in Cohort.objects.filter(pk__in=db_ids, team__project_id=team.project_id):
+        names[cohort.pk] = cohort.name
+    return names
+
+
 def get_breakdown_cohort_name(cohort_id: int, team: Team, not_in_cohort_name: str | None = None) -> str:
-    if cohort_id == ALL_USERS_COHORT_ID:
-        return "all users"
-    elif cohort_id == NOT_IN_COHORT_ID:
-        if not_in_cohort_name:
-            return f"Not in {not_in_cohort_name}"
-        return "Not in cohort"
-    else:
-        return Cohort.objects.get(pk=cohort_id, team__project_id=team.project_id).name
+    if cohort_id == NOT_IN_COHORT_ID and not_in_cohort_name:
+        return f"Not in {not_in_cohort_name}"
+    names = get_breakdown_cohort_names([cohort_id], team)
+    if cohort_id in names:
+        return names[cohort_id]
+    raise Cohort.DoesNotExist()
