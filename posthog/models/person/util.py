@@ -251,24 +251,24 @@ def _fetch_persons_by_distinct_ids_via_personhog(team_id: int, distinct_ids: lis
     ]
 
 
-def get_persons_by_distinct_ids(team_id: int, distinct_ids: list[str]) -> list[Person]:
+def get_persons_by_distinct_ids(
+    team_id: int, distinct_ids: list[str], *, operation: str = "get_persons_by_distinct_ids"
+) -> list[Person]:
     from posthog.personhog_client.gate import use_personhog
 
     if use_personhog():
         try:
             result = _fetch_persons_by_distinct_ids_via_personhog(team_id, distinct_ids)
-            PERSONHOG_ROUTING_TOTAL.labels(
-                operation="get_persons_by_distinct_ids", source="personhog", client_name=get_client_name()
-            ).inc()
+            PERSONHOG_ROUTING_TOTAL.labels(operation=operation, source="personhog", client_name=get_client_name()).inc()
             return result
         except Exception:
             PERSONHOG_ROUTING_ERRORS_TOTAL.labels(
-                operation="get_persons_by_distinct_ids",
+                operation=operation,
                 source="personhog",
                 error_type="grpc_error",
                 client_name=get_client_name(),
             ).inc()
-            logger.warning("personhog_get_persons_by_distinct_ids_failure", team_id=team_id, exc_info=True)
+            logger.warning("personhog_%s_failure", operation, team_id=team_id, exc_info=True)
 
     from django.db.models.query import Prefetch
 
@@ -289,9 +289,7 @@ def get_persons_by_distinct_ids(team_id: int, distinct_ids: list[str]) -> list[P
             )
         )
     )
-    PERSONHOG_ROUTING_TOTAL.labels(
-        operation="get_persons_by_distinct_ids", source="django_orm", client_name=get_client_name()
-    ).inc()
+    PERSONHOG_ROUTING_TOTAL.labels(operation=operation, source="django_orm", client_name=get_client_name()).inc()
     return list(persons)
 
 
@@ -470,7 +468,19 @@ def _validate_uuids_via_personhog(team_id: int, uuids: list[str]) -> list[str]:
         raise RuntimeError("personhog client not configured")
 
     resp = client.get_persons_by_uuids(GetPersonsByUuidsRequest(team_id=team_id, uuids=uuids))
-    return [p.uuid for p in resp.persons if p.team_id == team_id]
+    valid = [p for p in resp.persons if p.team_id == team_id]
+    mismatched = len(resp.persons) - len(valid)
+    if mismatched:
+        PERSONHOG_TEAM_MISMATCH_TOTAL.labels(
+            operation="validate_person_uuids_exist", client_name=get_client_name()
+        ).inc(mismatched)
+        logger.warning(
+            "personhog_team_mismatch",
+            operation="validate_person_uuids_exist",
+            team_id=team_id,
+            dropped=mismatched,
+        )
+    return [p.uuid for p in valid]
 
 
 def validate_person_uuids_exist(team_id: int, uuids: list[str]) -> list[str]:

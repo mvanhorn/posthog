@@ -350,6 +350,17 @@ class TestFetchPersonByDistinctIdFiltering(SimpleTestCase):
         assert result is None
         mock_client.get_distinct_ids_for_person.assert_not_called()
 
+    @patch("posthog.personhog_client.client.get_personhog_client")
+    def test_returns_none_when_empty_person_id(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.get_person_by_distinct_id.return_value = SimpleNamespace(person=SimpleNamespace(id=0, team_id=1))
+
+        result = _fetch_person_by_distinct_id_via_personhog(team_id=1, distinct_id="some-did")
+
+        assert result is None
+        mock_client.get_distinct_ids_for_person.assert_not_called()
+
     @patch("posthog.models.person.util.PERSONHOG_TEAM_MISMATCH_TOTAL")
     @patch("posthog.personhog_client.client.get_personhog_client")
     def test_returns_none_on_team_mismatch(self, mock_get_client, mock_mismatch_counter):
